@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# Copyright 2018 Masato Taruishi <taru@retty.me>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+# and associated documentation files (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all copies or substantial
+# portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+# LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
+set -e
+
+if test "x$DOCKERTIPS_DEBUG" != "x"; then
+  set -x
+fi
+ 
+export DOCKERTIPS_USER="${DOCKERTIPS_USER:-root}"
+export DOCKERTIPS_GROUP="${DOCKERTIPS_GROUP:-root}"
+
+export DOCKERTIPS_GID="${DOCKERTIPS_GID:-$(getent group $DOCKERTIPS_GROUP | cut -d: -f3)}"
+DOCKERTIPS_GID="${DOCKERTIPS_GID:-1000}"
+
+export DOCKERTIPS_UID="${DOCKERTIPS_UID:-$(getent passwd $DOCKERTIPS_USER | cut -d: -f3)}"
+DOCKERTIPS_UID="${DOCKERTIPS_UID:-1000}"
+
+export DOCKERTIPS_SHELL="${DOCKERTIPS_SHELL:-/bin/bash}"
+
+export DOCKERTIPS_HOME=$(getent passwd $DOCKERTIPS_USER | cut -d: -f6)
+DOCKERTIPS_HOME="${DOCKERTIPS_HOME:-/home/$DOCKERTIPS_USER}"
+ 
+getent group | grep ^$DOCKERTIPS_GROUP: > /dev/null ||
+    addgroup -q --system \
+        --gid $DOCKERTIPS_GID $DOCKERTIPS_GROUP
+ 
+getent passwd | grep ^$DOCKERTIPS_USER: > /dev/null ||
+    adduser -q --system \
+        --home $DOCKERTIPS_HOME \
+        --shell $DOCKERTIPS_SHELL --gid $DOCKERTIPS_GID --uid $DOCKERTIPS_UID \
+        $DOCKERTIPS_USER # 2> /dev/null
+
+ 
+# Propagates to the next step.
+if test "x$1" = "x"; then
+  cd $DOCKERTIPS_HOME && \
+      exec /usr/bin/env HOME=$DOCKERTIPS_HOME su -p -l $DOCKERTIPS_USER
+else
+  sudo -i -u $DOCKERTIPS_USER "$@"
+fi
