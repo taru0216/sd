@@ -1,0 +1,62 @@
+#!/bin/sh
+#
+
+set -ex
+
+UBUNTU_ARCH=${UBUNTU_ARCH:-amd64}
+UBUNTU_DIST=${UBUNTU_DIST:-bionic}
+UBUNTU_MIRROR=${UBUNTU_MIRROR:-http://jp.archive.ubuntu.com/ubuntu}
+
+UBUNTU_INSTALLER_URL=$UBUNTU_MIRROR/ubuntu/dists/$UBUNTU_DIST/main/installer-$UBUNTU_ARCH/current/images/netboot/ubuntu-installer
+
+
+if test "x$3" = "x"; then
+  echo "Usage: $0 <img> <size> <preseed>" 1>&2
+  exit 1
+fi
+
+if test -w "/dev/kvm"; then
+  QEMU_EXTRA_ARGS="--enable-kvm"
+fi
+
+KERNEL=$(mktemp)
+INITRD=$(mktemp)
+IMG=$(mktemp)
+TMPDIR=$(mktemp -d)
+trap "/bin/rm -rf $KERNEL $INITRD $IMG $TMPDIR" 0
+
+qemu-img create -f qcow2 $IMG $2
+
+curl -o $KERNEL $UBUNTU_INSTALLER_URL/$UBUNTU_ARCH/linux
+curl -o $INITRD $UBUNTU_INSTALLER_URL/$UBUNTU_ARCH/initrd.gz
+
+zcat $INITRD > $TMPDIR/initrd
+install -d $TMPDIR/preseed
+(
+  test -f "$3" || touch "$2"
+  cp $3 $TMPDIR/preseed/preseed.cfg
+
+  cd $TMPDIR/preseed
+  echo preseed.cfg | cpio -o --append -H newc -O $TMPDIR/initrd
+  gzip -c $TMPDIR/initrd > $INITRD
+)
+
+qemu-system-x86_64 \
+    -nodefaults \
+    -machine pc-i440fx-wily,usb=off,accel=kvm \
+    -cpu host \
+    -m 4096 \
+    -serial mon:stdio \
+    -drive file=$IMG,if=none,id=drive0 -device virtio-blk-pci,drive=drive0 \
+    -netdev user,id=mynet0 -device virtio-net-pci,netdev=mynet0 \
+    -nographic -device virtio-vga \
+    -no-reboot \
+    -kernel $KERNEL -initrd $INITRD \
+    -append "console=ttyS0
+        DEBIAN_FRONTEND=text
+        ---
+        console=ttyS0" \
+    $QEMU_EXTRA_ARGS
+
+install -d $(dirname $1)
+qemu-img convert -f qcow2 -c $IMG -O qcow2 $1
