@@ -1,0 +1,9 @@
+#!/bin/sh -ex
+
+ping -c 1 $DOCKERTIPS7_WEB_HOSTNAME
+
+for i in `seq 1 10`; do
+  curl -sf http://$DOCKERTIPS7_WEB_HOSTNAME:5000/ && exit 0
+  sleep $i
+done
+exit 1

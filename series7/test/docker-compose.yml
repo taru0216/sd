@@ -1,0 +1,28 @@
+version: "3"
+services:
+  web:
+    build: web
+    depends_on:
+      - mysql
+    environment:
+      DOCKERTIPS7_MYSQL_HOSTNAME: mysql
+      DOCKERTIPS7_MYSQL_PASSWD: password
+    links:
+      - mysql 
+
+  mysql:
+    image: mysql
+    volumes:
+      - "./mysql:/docker-entrypoint-initdb.d"
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: web
+
+  test:
+    build: test
+    depends_on:
+      - web
+    environment:
+      DOCKERTIPS7_WEB_HOSTNAME: web
+    links:
+      - web

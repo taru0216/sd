@@ -1,0 +1,3 @@
+#!/bin/sh -ex
+
+ZAP_PATH=/usr/share/owasp-zap/ xvfb-run zap-cli -v quick-scan --self-contained -s xss,sqli --start-options '-config api.disablekey=true' http://$DOCKERTIPS7_WEB_HOSTNAME:5000/
